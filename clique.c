@@ -230,34 +230,27 @@ FILE *subsystem_open(int cg, const char *device, const char *mode)
     return fdopen(fd, mode);
 }
 
-static void set_memory(const char *namespace)
+int main(void)
 {
+    char *namespace;
+    asprintf(&namespace, "session:%d", getpid());
+
     int memory = cg_open_controller("memory", "playpen", namespace, NULL);
     subsystem_set(memory, "tasks", "0");
     subsystem_set(memory, "memory.limit_in_bytes", "256M");
     close(memory);
-}
 
-static void set_devices(const char *namespace)
-{
     int devices = cg_open_controller("devices", "playpen", namespace, NULL);
     subsystem_set(devices, "tasks", "0");
     subsystem_set(devices, "devices.deny", "a");
     subsystem_set(devices, "devices.allow", "c 1:9 r");
     close(devices);
-}
-
-int main(void)
-{
-    char *namespace;
-    asprintf(&namespace, "session.%d", getpid());
-
-    set_memory(namespace);
-    set_devices(namespace);
 
     char *path = cg_get_path("memory", "playpen", namespace, NULL);
     printf("PATH: %s\n", path);
+
     free(path);
+    free(namespace);
 
     /* if (cg_destroy_controller("memory", "playpen", NULL) < 0) */
     /*     err(1, "destroying controller failed"); */
