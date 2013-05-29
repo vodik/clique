@@ -148,7 +148,7 @@ char *cg_get_path(const char *subsystem, ...)
     return path;
 }
 
-int cg_subsystem(const char *subsystem)
+int cg_open_subsystem(const char *subsystem)
 {
     char *root = cg_get_mount(subsystem);
     if (root == NULL)
