@@ -10,7 +10,98 @@
 #include <mntent.h>
 #include <sys/stat.h>
 
-static char *get_cg_mount(const char *subsystem)
+/* loosely adopted from systemd shared/mkdir.c */
+static int mkdir_parents(const char *path, mode_t mode)
+{
+    struct stat st;
+    const char *p, *e;
+
+    /* return immediately if directory exists */
+    e = strrchr(path, '/');
+    if (!e)
+        return -EINVAL;
+    p = strndupa(path, e - path);
+    if (stat(p, &st) >= 0) {
+        if ((st.st_mode & S_IFMT) == S_IFDIR)
+            return 0;
+        else
+            return -ENOTDIR;
+    }
+
+    /* create every parent directory in the path, except the last component */
+    p = path + strspn(path, "/");
+    for (;;) {
+        int r;
+        char *t;
+
+        e = p + strcspn(p, "/");
+        p = e + strspn(e, "/");
+
+        /* Is this the last component? If so, then we're
+         * done */
+        if (*p == 0)
+            return 0;
+
+        t = strndup(path, e - path);
+        if (!t)
+            return -ENOMEM;
+
+        r = mkdir(t, mode);
+        free(t);
+
+        if (r < 0 && errno != EEXIST)
+            return -errno;
+    }
+}
+
+/* loosely adopted from systemd shared/util.c */
+static char *vjoinpath(const char *root, va_list ap)
+{
+    size_t len;
+    char *ret, *p;
+    const char *temp;
+
+    va_list aq;
+    va_copy(aq, ap);
+
+    if (!root)
+        return NULL;
+
+    len = strlen(root);
+    while ((temp = va_arg(ap, const char *))) {
+        size_t temp_len = strlen(temp) + 1;
+        if (temp_len > ((size_t) -1) - len) {
+            return NULL;
+        }
+
+        len += temp_len;
+    }
+
+    ret = malloc(len + 1);
+    if (ret) {
+        p = stpcpy(ret, root);
+        while ((temp = va_arg(aq, const char *))) {
+            p++[0] = '/';
+            p = stpcpy(p, temp);
+        }
+    }
+
+    return ret;
+}
+
+/* static char *joinpath(const char *root, ...) */
+/* { */
+/*     va_list ap; */
+/*     char *ret; */
+
+/*     va_start(ap, root); */
+/*     ret = vjoinpath(root, ap); */
+/*     va_end(ap); */
+
+/*     return ret; */
+/* } */
+
+static char *cg_get_mount(const char *subsystem)
 {
     char *mnt = NULL;
     struct mntent mntent_r;
@@ -37,9 +128,32 @@ static char *get_cg_mount(const char *subsystem)
     return mnt;
 }
 
+static char *cg_path(const char *subsystem, va_list ap)
+{
+    char *root, *path;
+
+    root = cg_get_mount(subsystem);
+    path = vjoinpath(root, ap);
+
+    free(root);
+    return path;
+}
+
+char *cg_get_path(const char *subsystem, ...)
+{
+    va_list ap;
+    char *path;
+
+    va_start(ap, subsystem);
+    path = cg_path(subsystem, ap);
+    va_end(ap);
+
+    return path;
+}
+
 int cg_subsystem(const char *subsystem)
 {
-    char *root = get_cg_mount(subsystem);
+    char *root = cg_get_mount(subsystem);
     if (root == NULL)
         return -1;
 
@@ -51,7 +165,39 @@ int cg_subsystem(const char *subsystem)
     return dirfd;
 }
 
-int cg_create_controller(int cg, const char *controller)
+int cg_open_controller(const char *subsystem, ...)
+{
+    va_list ap;
+    char *path;
+
+    va_start(ap, subsystem);
+    path = cg_path(subsystem, ap);
+    va_end(ap);
+
+    int dirfd = open(path, O_RDONLY, FD_CLOEXEC);
+    free(path);
+
+    if (dirfd < 0)
+        return -1;
+    return dirfd;
+}
+
+int cg_destroy_controller(const char *subsystem, ...)
+{
+    va_list ap;
+    char *path;
+
+    va_start(ap, subsystem);
+    path = cg_path(subsystem, ap);
+    va_end(ap);
+
+    int rc = rmdir(path);
+
+    free(path);
+    return rc;
+}
+
+int cg_open_subcontroller(int cg, const char *controller)
 {
     if (mkdirat(cg, controller, 0755) < 0 && errno != EEXIST)
         return -1;
@@ -61,23 +207,6 @@ int cg_create_controller(int cg, const char *controller)
         return -1;
 
     return dirfd;
-}
-
-int cg_create_controller_path(const char *subsystem, ...)
-{
-    int cg = cg_subsystem(subsystem);
-    char *controller = NULL;
-    va_list ap;
-
-    va_start(ap, subsystem);
-    while ((controller = va_arg(ap, char *))) {
-        int temp = cg;
-        cg = cg_create_controller(cg, controller);
-        close(temp);
-    }
-    va_end(ap);
-
-    return cg;
 }
 
 int subsystem_set(int cg, const char *device, const char *value)
@@ -102,7 +231,7 @@ FILE *subsystem_open(int cg, const char *device, const char *mode)
 
 static void set_memory(void)
 {
-    int memory = cg_create_controller_path("memory", "playpen", NULL);
+    int memory = cg_open_controller("memory", "playpen", NULL);
     subsystem_set(memory, "tasks", "0");
     subsystem_set(memory, "memory.limit_in_bytes", "256M");
     close(memory);
@@ -110,7 +239,7 @@ static void set_memory(void)
 
 static void set_devices(void)
 {
-    int devices = cg_create_controller_path("devices", "playpen", NULL);
+    int devices = cg_open_controller("devices", "playpen", NULL);
     subsystem_set(devices, "tasks", "0");
     subsystem_set(devices, "devices.deny", "a");
     subsystem_set(devices, "devices.allow", "c 1:9 r");
@@ -121,4 +250,13 @@ int main(void)
 {
     set_memory();
     set_devices();
+
+    char *path = cg_get_path("memory", "playpen", NULL);
+    printf("PATH: %s\n", path);
+    free(path);
+
+    /* if (cg_destroy_controller("memory", "playpen", NULL) < 0) */
+    /*     err(1, "destroying controller failed"); */
+
+    sleep(40);
 }
