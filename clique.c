@@ -107,7 +107,7 @@ static char *cg_get_mount(const char *subsystem)
 
     file = setmntent("/proc/self/mounts", "r");
     if (!file)
-        err(1, "failed to open mounts");
+        return NULL;
 
     while ((getmntent_r(file, &mntent_r, buf, sizeof(buf)))) {
         if (strcmp(mntent_r.mnt_type, "cgroup") != 0)
