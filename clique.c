@@ -10,7 +10,7 @@
 #include <mntent.h>
 #include <sys/stat.h>
 
-static char *get_cgroup_mount(const char *subsystem)
+static char *get_cg_mount(const char *subsystem)
 {
     char *mnt = NULL;
     struct mntent mntent_r;
@@ -37,9 +37,9 @@ static char *get_cgroup_mount(const char *subsystem)
     return mnt;
 }
 
-int cgroup_subsystem(const char *subsystem)
+int cg_subsystem(const char *subsystem)
 {
-    char *root = get_cgroup_mount(subsystem);
+    char *root = get_cg_mount(subsystem);
     if (root == NULL)
         return -1;
 
@@ -51,7 +51,7 @@ int cgroup_subsystem(const char *subsystem)
     return dirfd;
 }
 
-int cgroup_controller(int cg, const char *controller)
+int cg_create_controller(int cg, const char *controller)
 {
     if (mkdirat(cg, controller, 0755) < 0 && errno != EEXIST)
         return -1;
@@ -63,16 +63,16 @@ int cgroup_controller(int cg, const char *controller)
     return dirfd;
 }
 
-int cgroup_controller_path(const char *subsystem, ...)
+int cg_create_controller_path(const char *subsystem, ...)
 {
-    int cg = cgroup_subsystem(subsystem);
+    int cg = cg_subsystem(subsystem);
     char *controller = NULL;
     va_list ap;
 
     va_start(ap, subsystem);
     while ((controller = va_arg(ap, char *))) {
         int temp = cg;
-        cg = cgroup_controller(cg, controller);
+        cg = cg_create_controller(cg, controller);
         close(temp);
     }
     va_end(ap);
@@ -91,9 +91,18 @@ int subsystem_set(int cg, const char *device, const char *value)
     return bytes_w;
 }
 
+FILE *subsystem_open(int cg, const char *device, const char *mode)
+{
+    int fd = openat(cg, device, O_RDWR, FD_CLOEXEC);
+    if (fd < 0)
+        return NULL;
+
+    return fdopen(fd, mode);
+}
+
 static void set_memory(void)
 {
-    int memory = cgroup_controller_path("memory", "playpen", NULL);
+    int memory = cg_create_controller_path("memory", "playpen", NULL);
     subsystem_set(memory, "tasks", "0");
     subsystem_set(memory, "memory.limit_in_bytes", "256M");
     close(memory);
@@ -101,7 +110,7 @@ static void set_memory(void)
 
 static void set_devices(void)
 {
-    int devices = cgroup_controller_path("devices", "playpen", NULL);
+    int devices = cg_create_controller_path("devices", "playpen", NULL);
     subsystem_set(devices, "tasks", "0");
     subsystem_set(devices, "devices.deny", "a");
     subsystem_set(devices, "devices.allow", "c 1:9 r");
