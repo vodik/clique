@@ -43,7 +43,7 @@ int cgroup_subsystem(const char *subsystem)
     if (root == NULL)
         return -1;
 
-    int dirfd = open(root, O_RDONLY);
+    int dirfd = open(root, O_RDONLY, FD_CLOEXEC);
     free(root);
 
     if (dirfd < 0)
@@ -56,7 +56,7 @@ int cgroup_controller(int cg, const char *controller)
     if (mkdirat(cg, controller, 0755) < 0 && errno != EEXIST)
         return -1;
 
-    int dirfd = openat(cg, controller, O_RDONLY);
+    int dirfd = openat(cg, controller, O_RDONLY, FD_CLOEXEC);
     if (dirfd < 0)
         return -1;
 
@@ -82,7 +82,7 @@ int cgroup_controller_path(const char *subsystem, ...)
 
 int subsystem_set(int cg, const char *device, const char *value)
 {
-    int fd = openat(cg, device, O_WRONLY);
+    int fd = openat(cg, device, O_WRONLY, FD_CLOEXEC);
     if (fd < 0)
         return -1;
 
