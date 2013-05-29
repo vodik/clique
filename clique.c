@@ -10,10 +10,6 @@
 #include <mntent.h>
 #include <sys/stat.h>
 
-struct cgroup {
-    int dirfd;
-};
-
 static char *get_cgroup_mount(const char *subsystem)
 {
     char *mnt = NULL;
@@ -41,46 +37,52 @@ static char *get_cgroup_mount(const char *subsystem)
     return mnt;
 }
 
-struct cgroup *cgroup_subsystem(const char *subsystem)
+int cgroup_subsystem(const char *subsystem)
 {
-    struct cgroup *cg = NULL;
-    char *root;
-    int dirfd;
-
-    root = get_cgroup_mount(subsystem);
+    char *root = get_cgroup_mount(subsystem);
     if (root == NULL)
-        return NULL;
+        return -1;
 
-    dirfd = open(root, O_RDONLY);
-    if (dirfd < 0)
-        goto cleanup;
-
-    cg = malloc(sizeof(struct cgroup));
-    cg->dirfd = dirfd;
-
-cleanup:
+    int dirfd = open(root, O_RDONLY);
     free(root);
+
+    if (dirfd < 0)
+        return -1;
+    return dirfd;
+}
+
+int cgroup_controller(int cg, const char *controller)
+{
+    if (mkdirat(cg, controller, 0755) < 0 && errno != EEXIST)
+        return -1;
+
+    int dirfd = openat(cg, controller, O_RDONLY);
+    if (dirfd < 0)
+        return -1;
+
+    return dirfd;
+}
+
+int cgroup_controller_path(const char *subsystem, ...)
+{
+    int cg = cgroup_subsystem(subsystem);
+    char *controller = NULL;
+    va_list ap;
+
+    va_start(ap, subsystem);
+    while ((controller = va_arg(ap, char *))) {
+        int temp = cg;
+        cg = cgroup_controller(cg, controller);
+        close(temp);
+    }
+    va_end(ap);
+
     return cg;
 }
 
-struct cgroup *cgroup_controller(struct cgroup *cg, const char *controller)
+int subsystem_set(int cg, const char *device, const char *value)
 {
-    if (mkdirat(cg->dirfd, controller, 0755) < 0 && errno != EEXIST)
-        return NULL;
-
-    int dirfd = openat(cg->dirfd, controller, O_RDONLY);
-    if (dirfd < 0)
-        return NULL;
-
-    struct cgroup *ccg = malloc(sizeof(struct cgroup));
-    ccg->dirfd = dirfd;
-
-    return ccg;
-}
-
-int subsystem_set(struct cgroup *cg, const char *device, const char *value)
-{
-    int fd = openat(cg->dirfd, device, O_WRONLY);
+    int fd = openat(cg, device, O_WRONLY);
     if (fd < 0)
         return -1;
 
@@ -91,27 +93,23 @@ int subsystem_set(struct cgroup *cg, const char *device, const char *value)
 
 static void set_memory(void)
 {
-    struct cgroup *memory  = cgroup_subsystem("memory");
-    struct cgroup *playpen = cgroup_controller(memory, "playpen");
-
-    subsystem_set(playpen, "tasks", "0");
-    subsystem_set(playpen, "memory.limit_in_bytes", "256M");
+    int memory = cgroup_controller_path("memory", "playpen", NULL);
+    subsystem_set(memory, "tasks", "0");
+    subsystem_set(memory, "memory.limit_in_bytes", "256M");
+    close(memory);
 }
 
 static void set_devices(void)
 {
-    struct cgroup *memory  = cgroup_subsystem("devices");
-    struct cgroup *playpen = cgroup_controller(memory, "playpen");
-
-    subsystem_set(playpen, "tasks", "0");
-    subsystem_set(playpen, "devices.deny", "a");
-    subsystem_set(playpen, "devices.allow", "c 1:9 r");
+    int devices = cgroup_controller_path("devices", "playpen", NULL);
+    subsystem_set(devices, "tasks", "0");
+    subsystem_set(devices, "devices.deny", "a");
+    subsystem_set(devices, "devices.allow", "c 1:9 r");
+    close(devices);
 }
 
 int main(void)
 {
     set_memory();
     set_devices();
-
-    sleep(50);
 }
