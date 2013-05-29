@@ -16,12 +16,8 @@ static int mkdir_parents(const char *path, mode_t mode)
     struct stat st;
     const char *p, *e;
 
-    /* return immediately if directory exists */
-    e = strrchr(path, '/');
-    if (!e)
-        return -EINVAL;
-    p = strndupa(path, e - path);
-    if (stat(p, &st) >= 0) {
+    /* return immedately if directory exists */
+    if (stat(path, &st) >= 0) {
         if ((st.st_mode & S_IFMT) == S_IFDIR)
             return 0;
         else
@@ -37,11 +33,6 @@ static int mkdir_parents(const char *path, mode_t mode)
         e = p + strcspn(p, "/");
         p = e + strspn(e, "/");
 
-        /* Is this the last component? If so, then we're
-         * done */
-        if (*p == 0)
-            return 0;
-
         t = strndup(path, e - path);
         if (!t)
             return -ENOMEM;
@@ -49,8 +40,14 @@ static int mkdir_parents(const char *path, mode_t mode)
         r = mkdir(t, mode);
         free(t);
 
-        if (r < 0 && errno != EEXIST)
+        if (r < 0 && errno != EEXIST) {
+            printf("ERROR!\n");
             return -errno;
+        }
+
+        /* Is this the last component? If so, then we're * done */
+        if (*p == 0)
+            return 0;
     }
 }
 
@@ -174,6 +171,10 @@ int cg_open_controller(const char *subsystem, ...)
     path = cg_path(subsystem, ap);
     va_end(ap);
 
+    int rc = mkdir_parents(path, 0755);
+    if (rc < 0)
+        return -1;
+
     int dirfd = open(path, O_RDONLY, FD_CLOEXEC);
     free(path);
 
@@ -229,17 +230,17 @@ FILE *subsystem_open(int cg, const char *device, const char *mode)
     return fdopen(fd, mode);
 }
 
-static void set_memory(void)
+static void set_memory(const char *namespace)
 {
-    int memory = cg_open_controller("memory", "playpen", NULL);
+    int memory = cg_open_controller("memory", "playpen", namespace, NULL);
     subsystem_set(memory, "tasks", "0");
     subsystem_set(memory, "memory.limit_in_bytes", "256M");
     close(memory);
 }
 
-static void set_devices(void)
+static void set_devices(const char *namespace)
 {
-    int devices = cg_open_controller("devices", "playpen", NULL);
+    int devices = cg_open_controller("devices", "playpen", namespace, NULL);
     subsystem_set(devices, "tasks", "0");
     subsystem_set(devices, "devices.deny", "a");
     subsystem_set(devices, "devices.allow", "c 1:9 r");
@@ -248,10 +249,13 @@ static void set_devices(void)
 
 int main(void)
 {
-    set_memory();
-    set_devices();
+    char *namespace;
+    asprintf(&namespace, "session.%d", getpid());
 
-    char *path = cg_get_path("memory", "playpen", NULL);
+    set_memory(namespace);
+    set_devices(namespace);
+
+    char *path = cg_get_path("memory", "playpen", namespace, NULL);
     printf("PATH: %s\n", path);
     free(path);
 
