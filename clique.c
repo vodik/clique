@@ -9,7 +9,6 @@
 
 #include <mntent.h>
 #include <sys/stat.h>
-#include <linux/limits.h>
 
 struct cgroup {
     int dirfd;
