@@ -1,4 +1,22 @@
-#define _GNU_SOURCE
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Copyright (C) Simon Gomizelj, 2013
+ */
+
+#include "cgroups.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -7,7 +25,6 @@
 #include <err.h>
 #include <fcntl.h>
 #include <unistd.h>
-
 #include <mntent.h>
 #include <sys/stat.h>
 
@@ -42,7 +59,6 @@ static int mkdir_parents(const char *path, mode_t mode)
         free(t);
 
         if (r < 0 && errno != EEXIST) {
-            printf("ERROR!\n");
             return -errno;
         }
 
@@ -53,7 +69,7 @@ static int mkdir_parents(const char *path, mode_t mode)
 }
 
 /* loosely adopted from systemd shared/util.c */
-static char *vjoinpath(const char *root, va_list ap)
+static char *joinpath(const char *root, va_list ap)
 {
     size_t len;
     char *ret, *p;
@@ -87,18 +103,6 @@ static char *vjoinpath(const char *root, va_list ap)
     return ret;
 }
 
-/* static char *joinpath(const char *root, ...) */
-/* { */
-/*     va_list ap; */
-/*     char *ret; */
-
-/*     va_start(ap, root); */
-/*     ret = vjoinpath(root, ap); */
-/*     va_end(ap); */
-
-/*     return ret; */
-/* } */
-
 static char *cg_get_mount(const char *subsystem)
 {
     char *mnt = NULL;
@@ -118,7 +122,6 @@ static char *cg_get_mount(const char *subsystem)
             continue;
 
         mnt = strdup(mntent_r.mnt_dir);
-        fprintf(stderr, "using cgroup mounted at '%s'\n", mnt);
         break;
     };
 
@@ -131,7 +134,7 @@ static char *cg_path(const char *subsystem, va_list ap)
     char *root, *path;
 
     root = cg_get_mount(subsystem);
-    path = vjoinpath(root, ap);
+    path = joinpath(root, ap);
 
     free(root);
     return path;
@@ -172,8 +175,8 @@ int cg_open_controller(const char *subsystem, ...)
     path = cg_path(subsystem, ap);
     va_end(ap);
 
-    int rc = mkdir_parents(path, 0755);
-    if (rc < 0)
+    int ret = mkdir_parents(path, 0755);
+    if (ret < 0)
         return -1;
 
     int dirfd = open(path, O_RDONLY | O_CLOEXEC);
@@ -193,10 +196,10 @@ int cg_destroy_controller(const char *subsystem, ...)
     path = cg_path(subsystem, ap);
     va_end(ap);
 
-    int rc = rmdir(path);
+    int ret = rmdir(path);
 
     free(path);
-    return rc;
+    return ret;
 }
 
 int cg_open_subcontroller(int cg, const char *controller)
@@ -229,32 +232,4 @@ FILE *subsystem_open(int cg, const char *device, const char *mode)
         return NULL;
 
     return fdopen(fd, mode);
-}
-
-int main(void)
-{
-    char *namespace;
-    asprintf(&namespace, "session:%d", getpid());
-
-    int memory = cg_open_controller("memory", "playpen", namespace, NULL);
-    subsystem_set(memory, "tasks", "0");
-    subsystem_set(memory, "memory.limit_in_bytes", "256M");
-    close(memory);
-
-    int devices = cg_open_controller("devices", "playpen", namespace, NULL);
-    subsystem_set(devices, "tasks", "0");
-    subsystem_set(devices, "devices.deny", "a");
-    subsystem_set(devices, "devices.allow", "c 1:9 r");
-    close(devices);
-
-    char *path = cg_get_path("memory", "playpen", namespace, NULL);
-    printf("PATH: %s\n", path);
-
-    free(path);
-    free(namespace);
-
-    /* if (cg_destroy_controller("memory", "playpen", NULL) < 0) */
-    /*     err(1, "destroying controller failed"); */
-
-    sleep(40);
 }

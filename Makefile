@@ -1,5 +1,5 @@
 CC = clang
-CXXFLAGS = -std=c99 -O2 -Wmost
+CFLAGS = -std=c99 -O2 -Wmost -D_GNU_SOURCE
 LDFLAGS = -Wl,--as-needed
 
-clique: clique.c
+test: test.c cgroups.c
