@@ -7,6 +7,14 @@
 
 #include "dbus.h"
 
+static inline int dbus_try_read_object(dbus_bus *bus, dbus_message *reply, const char **ret)
+{
+    int rc = dbus_message_read(reply, "o", ret);
+    if (rc < 0)
+        dbus_message_read(reply, "s", bus->error);
+    return rc;
+}
+
 int start_transient_scope(dbus_bus *bus,
                           const char *name,
                           const char *mode,
@@ -43,9 +51,33 @@ int start_transient_scope(dbus_bus *bus,
     dbus_message_free(m);
 
     if (ret) {
-        rc = dbus_message_read(reply, "o", ret);
-        if (rc < 0)
-            dbus_message_read(reply, "s", ret);
+        rc = dbus_try_read_object(bus, reply, ret);
+        dbus_message_free(reply);
+    }
+
+    return rc;
+}
+
+int get_unit_by_pid(dbus_bus *bus, uint32_t pid, const char **ret)
+{
+    int rc = 0;
+    dbus_message *m;
+    dbus_new_method_call("org.freedesktop.systemd1",
+                         "/org/freedesktop/systemd1",
+                         "org.freedesktop.systemd1.Manager",
+                         "GetUnitByPID", &m);
+
+    if (pid == 0)
+        pid = getpid();
+
+    dbus_message_append(m, "u", pid);
+
+    dbus_message *reply;
+    dbus_send_with_reply_and_block(bus, m, ret ? &reply : NULL);
+    dbus_message_free(m);
+
+    if (ret) {
+        rc = dbus_try_read_object(bus, reply, ret);
         dbus_message_free(reply);
     }
 
@@ -68,9 +100,7 @@ int get_unit(dbus_bus *bus, const char *name, const char **ret)
     dbus_message_free(m);
 
     if (ret) {
-        rc = dbus_message_read(reply, "o", ret);
-        if (rc < 0)
-            dbus_message_read(reply, "s", ret);
+        rc = dbus_try_read_object(bus, reply, ret);
         dbus_message_free(reply);
     }
 
