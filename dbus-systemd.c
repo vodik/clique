@@ -1,18 +1,20 @@
 #include "dbus-systemd.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <unistd.h>
 
 #include "dbus.h"
 
-void start_transient_scope(dbus_bus *bus,
-                           const char *name,
-                           const char *mode,
-                           const char *slice,
-                           const char *description,
-                           dbus_message **ret)
+int start_transient_scope(dbus_bus *bus,
+                          const char *name,
+                          const char *mode,
+                          const char *slice,
+                          const char *description,
+                          const char **ret)
 {
+    int rc = 0;
     dbus_message *m;
     dbus_new_method_call("org.freedesktop.systemd1",
                          "/org/freedesktop/systemd1",
@@ -36,12 +38,23 @@ void start_transient_scope(dbus_bus *bus,
                                 "/dev/null",    "rw");
     dbus_close_container(m);
 
-    dbus_send_with_reply_and_block(bus, m, ret);
+    dbus_message *reply;
+    dbus_send_with_reply_and_block(bus, m, ret ? &reply : NULL);
     dbus_message_free(m);
+
+    if (ret) {
+        rc = dbus_message_read(reply, "o", ret);
+        if (rc < 0)
+            dbus_message_read(reply, "s", ret);
+        dbus_message_free(reply);
+    }
+
+    return rc;
 }
 
-void get_unit(dbus_bus *bus, const char *name, dbus_message **ret)
+int get_unit(dbus_bus *bus, const char *name, const char **ret)
 {
+    int rc = 0;
     dbus_message *m;
     dbus_new_method_call("org.freedesktop.systemd1",
                          "/org/freedesktop/systemd1",
@@ -49,6 +62,17 @@ void get_unit(dbus_bus *bus, const char *name, dbus_message **ret)
                          "GetUnit", &m);
 
     dbus_message_append(m, "s", name);
-    dbus_send_with_reply_and_block(bus, m, ret);
+
+    dbus_message *reply;
+    dbus_send_with_reply_and_block(bus, m, ret ? &reply : NULL);
     dbus_message_free(m);
+
+    if (ret) {
+        rc = dbus_message_read(reply, "o", ret);
+        if (rc < 0)
+            dbus_message_read(reply, "s", ret);
+        dbus_message_free(reply);
+    }
+
+    return rc;
 }

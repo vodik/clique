@@ -3,15 +3,15 @@
 
 #include "dbus.h"
 
-void start_transient_scope(dbus_bus *bus,
-                           const char *name,
-                           const char *mode,
-                           const char *slice,
-                           const char *description,
-                           dbus_message **ret);
+int start_transient_scope(dbus_bus *bus,
+                          const char *name,
+                          const char *mode,
+                          const char *slice,
+                          const char *description,
+                          const char **ret);
 
-void get_unit(dbus_bus *bus,
-              const char *name,
-              dbus_message **ret);
+int get_unit(dbus_bus *bus,
+             const char *name,
+             const char **ret);
 
 #endif

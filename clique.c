@@ -7,24 +7,31 @@
 
 int main(void)
 {
+    int rc;
+    const char *path;
     dbus_bus *bus;
     dbus_message *reply;
-    const char *path = "/org/freedesktop/systemd1/unit/gpg_2dagent_2d1_2escope";
 
     dbus_open(DBUS_BUS_SYSTEM, &bus);
-    start_transient_scope(bus, "gpg-agent-1.scope",
-                          "fail",
-                          "user-1000.slice",
-                          "transient unit test",
-                          &reply);
-    dbus_message_read(reply, "o",  &path);
-    printf("REPLY: %s\n", path);
-    dbus_message_free(reply);
+    rc = start_transient_scope(bus, "gpg-agent-1.scope",
+                               "fail",
+                               "user-1000.slice",
+                               "transient unit test",
+                               &path);
+    if (rc < 0) {
+        printf("failed to start transient scope: %s\n", path);
+        return 1;
+    }
 
-    get_unit(bus, "gpg-agent-1.scope", &reply);
-    dbus_message_read(reply, "o",  &path);
     printf("REPLY: %s\n", path);
-    dbus_message_free(reply);
+
+    rc = get_unit(bus, "gpg-agent-1.scope", &path);
+    if (rc < 0) {
+        printf("failed to get unit path: %s\n", path);
+        return 1;
+    }
+
+    printf("REPLY: %s\n", path);
 
     dbus_message *m;
     dbus_new_method_call("org.freedesktop.systemd1",
