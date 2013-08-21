@@ -44,7 +44,7 @@ int main(void)
                                pid, &path);
     if (rc < 0) {
         printf("failed to start transient scope: %s\n", bus->error);
-        _exit(1);
+        return 1;
     }
 
     /* get the assiociated unit */
