@@ -141,6 +141,41 @@ void dbus_close(dbus_bus *bus)
     free(bus);
 }
 
+/* {{{ stack */
+int dbus_open_container(dbus_message *m, const char type, const char *contents)
+{
+    if (m->pos + 1 == m->size) {
+        m->size *= 2;
+        m->stack = realloc(m->stack, sizeof(DBusMessageIter) * 10);
+    }
+
+    DBusMessageIter *parent = &m->stack[m->pos++];
+    DBusMessageIter *child  = &m->stack[m->pos];
+
+    return dbus_message_iter_open_container(parent, type, contents, child);
+}
+
+int dbus_close_container(dbus_message *m)
+{
+    DBusMessageIter *child  = &m->stack[m->pos--];
+    DBusMessageIter *parent = &m->stack[m->pos];
+
+    return dbus_message_iter_close_container(parent, child);
+}
+/* }}} */
+
+static dbus_message *dbus_message_create(DBusMessage *msg)
+{
+    dbus_message *m = malloc(sizeof(dbus_message));
+    *m = (dbus_message){
+        .size  = 10,
+        .stack = malloc(sizeof(DBusMessageIter) * 10),
+        .pos   = 0,
+        .msg   = msg
+    };
+    return m;
+}
+
 int dbus_new_method_call(const char *destination,
                          const char *path,
                          const char *interface,
@@ -155,14 +190,7 @@ int dbus_new_method_call(const char *destination,
     if (!msg)
         return -1;
 
-    dbus_message *m = malloc(sizeof(dbus_message));
-    *m = (dbus_message){
-        .size  = 10,
-        .stack = malloc(sizeof(DBusMessageIter) * 10),
-        .pos   = 0,
-        .msg   = msg
-    };
-
+    dbus_message *m = dbus_message_create(msg);
     dbus_message_iter_init_append(msg, &m->stack[m->pos]);
     *ret = m;
     return 0;
@@ -196,45 +224,11 @@ int dbus_send_with_reply_and_block(dbus_bus *bus, dbus_message *m,
             exit(1);
         }
 
-        /* XXX: fixme */
-        dbus_message *reply = malloc(sizeof(dbus_message));
-        *reply = (dbus_message){
-            .size  = 10,
-            .stack = malloc(sizeof(DBusMessageIter) * 10),
-            .pos   = 0,
-            .msg   = msg
-        };
-
-        *ret = reply;
+        *ret = dbus_message_create(msg);
     }
 
     dbus_pending_call_unref(pending);
     return 0;
-}
-
-int dbus_open_container(dbus_message *m, const char type, const char *contents)
-{
-    if (m->pos + 1 == m->size) {
-        printf("--- RESIZE %zd ", m->size);
-        m->size *= 2;
-        printf("- %zd\n", m->size);
-        m->stack = realloc(m->stack, sizeof(DBusMessageIter) * 10);
-    }
-
-    DBusMessageIter *parent = &m->stack[m->pos++];
-    DBusMessageIter *child  = &m->stack[m->pos];
-
-    printf("LEVEL ++ : %zd\n", m->pos);
-    return dbus_message_iter_open_container(parent, type, contents, child);
-}
-
-int dbus_close_container(dbus_message *m)
-{
-    DBusMessageIter *child  = &m->stack[m->pos--];
-    DBusMessageIter *parent = &m->stack[m->pos];
-
-    printf("LEVEL -- : %zd\n", m->pos);
-    return dbus_message_iter_close_container(parent, child);
 }
 
 
@@ -253,7 +247,6 @@ static inline int dbus_message_append_16bytes(DBusMessageIter *iter, char type, 
 static inline int dbus_message_append_32bytes(DBusMessageIter *iter, char type, va_list ap)
 {
     uint32_t val = (uint32_t)va_arg(ap, uint32_t);
-    printf("> UINT: %u\n", val);
     return dbus_message_iter_append_basic(iter, type, &val);
 }
 
@@ -266,7 +259,6 @@ static inline int dbus_message_append_64bytes(DBusMessageIter *iter, char type, 
 static inline int dbus_message_append_cstring(DBusMessageIter *iter, char type, va_list ap)
 {
     const char *val = va_arg(ap, const char *);
-    printf("> STRING: %s\n", val);
     return dbus_message_iter_append_basic(iter, type, &val);
 }
 
@@ -278,7 +270,6 @@ static inline int dbus_message_append_variant(dbus_message *m, va_list ap)
     if (!type)
         return -EINVAL;
 
-    printf("! VARIANT\n");
     int r = dbus_open_container(m, 'v', type);
     if (r < 0)
         return r;
@@ -300,8 +291,6 @@ static inline int dbus_message_append_struct(dbus_message *m, const char **t, va
     char s[k - 1];
     memcpy(s, *t + 1, k - 2);
     s[k - 2] = 0;
-
-    printf("! STRUCT: %s\n", *t);
     *t += k - 1;
 
     r = dbus_open_container(m, 'r', NULL);
@@ -309,16 +298,14 @@ static inline int dbus_message_append_struct(dbus_message *m, const char **t, va
         return r;
 
     r = dbus_message_append_ap(m, s, ap);
-    /* if (r < 0) */
-    /*     return r; */
+    if (r < 0)
+        return r;
 
     return dbus_close_container(m);
 }
 
 static inline int dbus_message_append_array(dbus_message *m, const char **t, va_list ap)
 {
-    /* yeah, im passing in the length and ignoring it, i know...
-     * assuming length == 1 atm */
     unsigned length = (unsigned)va_arg(ap, unsigned);
 
     size_t k;
@@ -326,13 +313,10 @@ static inline int dbus_message_append_array(dbus_message *m, const char **t, va_
     if (r < 0)
         return r;
 
-    char s[k - 1];
+    char s[k];
     memcpy(s, *t + 1, k);
     s[k] = 0;
-
-    printf("! ARRAY: %d - %s\n", length, s);
     *t += k;
-    printf("LEFT: %s\n", *t);
 
     r = dbus_open_container(m, 'a', s);
     if (r < 0)
@@ -410,8 +394,6 @@ int dbus_message_append(dbus_message *m, const char *types, ...)
 
     if (!m)
         return -EINVAL;
-    /* if (m->sealed) */
-    /*     return -EPERM; */
     if (!types)
         return 0;
 
