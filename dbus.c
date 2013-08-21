@@ -162,6 +162,26 @@ int dbus_close_container(dbus_message *m)
 
     return dbus_message_iter_close_container(parent, child);
 }
+
+void dbus_recurse(dbus_message *m)
+{
+    if (m->pos + 1 == m->size) {
+        m->size *= 2;
+        m->stack = realloc(m->stack, sizeof(DBusMessageIter) * 10);
+    }
+
+    DBusMessageIter *parent = &m->stack[m->pos++];
+    DBusMessageIter *child  = &m->stack[m->pos];
+
+    dbus_message_iter_recurse(parent, child);
+}
+
+void dbus_next(dbus_message *m)
+{
+    m->pos--;
+    dbus_message_iter_next(&m->stack[m->pos]);
+}
+
 /* }}} */
 
 static dbus_message *dbus_message_create(DBusMessage *msg)
@@ -224,7 +244,9 @@ int dbus_send_with_reply_and_block(dbus_bus *bus, dbus_message *m,
             exit(1);
         }
 
-        *ret = dbus_message_create(msg);
+        dbus_message *r = dbus_message_create(msg);
+        dbus_message_iter_init(msg, &r->stack[r->pos]);
+        *ret = r;
     }
 
     dbus_pending_call_unref(pending);
@@ -404,7 +426,92 @@ int dbus_message_append(dbus_message *m, const char *types, ...)
     return r;
 }
 
+int dbus_message_read_basic(DBusMessageIter *iter, char type, va_list ap)
+{
+    void *p = va_arg(ap, void *);
+
+    int t = dbus_message_iter_get_arg_type(iter);
+    if (t != type)
+        return -EINVAL;
+
+    dbus_message_iter_get_basic(iter, (const char **)p);
+    return 0;
+}
+
+int dbus_message_read_ap(dbus_message *m, const char *types, va_list ap);
+
+static inline int dbus_message_read_variant(dbus_message *m, va_list ap)
+{
+    const char *type = va_arg(ap, const char *);
+    if (!type)
+        return -EINVAL;
+
+    int t = dbus_message_iter_get_arg_type(&m->stack[m->pos]);
+    if (t != 'v')
+        return -EINVAL;
+
+    dbus_recurse(m);
+    int r = dbus_message_read_ap(m, type, ap);
+    dbus_next(m);
+
+    return r;
+}
+
+int dbus_message_read_ap(dbus_message *m, const char *types, va_list ap)
+{
+    int r;
+
+    if (!types)
+        return 0;
+
+    const char *t;
+    for (t = types; *t; ++t) {
+        DBusMessageIter *iter = &m->stack[m->pos];
+
+        switch (*t) {
+        case DBUS_TYPE_BYTE:
+        case DBUS_TYPE_BOOLEAN:
+        case DBUS_TYPE_INT16:
+        case DBUS_TYPE_UINT16:
+        case DBUS_TYPE_INT32:
+        case DBUS_TYPE_UINT32:
+        case DBUS_TYPE_INT64:
+        case DBUS_TYPE_UINT64:
+        case DBUS_TYPE_DOUBLE:
+        case DBUS_TYPE_STRING:
+        case DBUS_TYPE_OBJECT_PATH:
+        case DBUS_TYPE_SIGNATURE:
+        case DBUS_TYPE_UNIX_FD:
+            r = dbus_message_read_basic(iter, *t, ap);
+            break;
+        case DBUS_TYPE_VARIANT:
+            r = dbus_message_read_variant(m, ap);
+            break;
+        default:
+            printf("reading %c unimplemented\n", *t);
+            r = -EINVAL;
+        }
+
+        if (r < 0)
+            return r;
+    }
+
+    return 0;
+}
+
 int dbus_message_read(dbus_message *m, const char *types, ...)
 {
-    return 0;
+    va_list ap;
+    int r;
+
+    if (!m)
+        return -EINVAL;
+    if (!types)
+        return 0;
+
+    va_start(ap, types);
+    r = dbus_message_read_ap(m, types, ap);
+    va_end(ap);
+
+    return r;
 }
