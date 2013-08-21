@@ -8,7 +8,7 @@ LDLIBS = -ldbus-1
 
 all: clique
 
-clique: clique.o dbus.o dbus-systemd.o
+clique: clique.o dbus-lib.o dbus-util.o dbus-systemd.o
 
 clean:
 	${RM} clique *.o

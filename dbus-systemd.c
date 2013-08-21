@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
-#include "dbus.h"
+#include "dbus-lib.h"
 
 static inline int dbus_try_read_object(dbus_bus *bus, dbus_message *reply, const char **ret)
 {

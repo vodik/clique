@@ -1,7 +1,7 @@
 #ifndef DBUS_SYSTEMD
 #define DBUS_SYSTEMD
 
-#include "dbus.h"
+#include "dbus-lib.h"
 
 int start_transient_scope(dbus_bus *bus,
                           const char *name,
