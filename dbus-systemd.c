@@ -9,9 +9,16 @@
 
 static inline int dbus_try_read_object(dbus_bus *bus, dbus_message *reply, const char **ret)
 {
-    int rc = dbus_message_read(reply, "o", ret);
-    if (rc < 0)
-        dbus_message_read(reply, "s", bus->error);
+    int type = dbus_message_type(reply);
+    int rc = 0;
+
+    if (type == 'o')
+        rc = dbus_message_read(reply, "o", ret);
+    else if (type == 's') {
+        rc = -1;
+        dbus_message_read(reply, "s", &bus->error);
+    }
+
     return rc;
 }
 
@@ -19,6 +26,7 @@ int start_transient_scope(dbus_bus *bus,
                           const char *name,
                           const char *slice,
                           const char *description,
+                          uint32_t pid,
                           const char **ret)
 {
     int rc = 0;
@@ -28,8 +36,9 @@ int start_transient_scope(dbus_bus *bus,
                          "org.freedesktop.systemd1.Manager",
                          "StartTransientUnit", &m);
 
-    uint32_t pid = getpid();
     uint64_t mem = 1024 * 1024 * 128;
+    if (pid == 0)
+        pid = getpid();
 
     dbus_message_append(m, "ss", name, "fail");
 
@@ -104,4 +113,18 @@ int get_unit(dbus_bus *bus, const char *name, const char **ret)
     }
 
     return rc;
+}
+
+void unit_kill(dbus_bus *bus, const char *path, int32_t signal)
+{
+    printf("PATH: %s\n", path);
+    dbus_message *m;
+    dbus_new_method_call("org.freedesktop.systemd1",
+                         path,
+                         "org.freedesktop.systemd1.Unit",
+                         "Stop", &m);
+
+    dbus_message_append(m, "si", "fail", signal);
+    dbus_send_with_reply_and_block(bus, m, NULL);
+    dbus_message_free(m);
 }
