@@ -5,41 +5,15 @@
 #include "dbus.h"
 #include "dbus-systemd.h"
 
-int main(void)
+static int dump_properties(dbus_bus *bus, const char *path, const char *interface)
 {
-    int rc;
-    const char *path;
-    dbus_bus *bus;
-    dbus_message *reply;
-
-    dbus_open(DBUS_BUS_SYSTEM, &bus);
-    rc = start_transient_scope(bus, "gpg-agent-1.scope",
-                               "fail",
-                               "user-1000.slice",
-                               "transient unit test",
-                               &path);
-    if (rc < 0) {
-        printf("failed to start transient scope: %s\n", path);
-        return 1;
-    }
-
-    printf("REPLY: %s\n", path);
-
-    rc = get_unit(bus, "gpg-agent-1.scope", &path);
-    if (rc < 0) {
-        printf("failed to get unit path: %s\n", path);
-        return 1;
-    }
-
-    printf("REPLY: %s\n", path);
-
-    dbus_message *m;
+    dbus_message *m, *reply;
     dbus_new_method_call("org.freedesktop.systemd1",
                          path,
                          "org.freedesktop.DBus.Properties",
                          "GetAll", &m);
 
-    dbus_message_append(m, "s", "org.freedesktop.systemd1.Unit");
+    dbus_message_append(m, "s", interface);
 
     dbus_send_with_reply_and_block(bus, m, &reply);
     dbus_message_free(m);
@@ -134,6 +108,38 @@ int main(void)
     }
 
     dbus_message_free(reply);
+    return 0;
+}
+
+int main(void)
+{
+    int rc;
+    const char *path;
+    dbus_bus *bus;
+
+    dbus_open(DBUS_BUS_SYSTEM, &bus);
+    rc = start_transient_scope(bus, "gpg-agent-1.scope",
+                               "fail",
+                               "user-1000.slice",
+                               "transient unit test",
+                               &path);
+    if (rc < 0) {
+        printf("failed to start transient scope: %s\n", path);
+        return 1;
+    }
+
+    printf("REPLY: %s\n", path);
+
+    rc = get_unit(bus, "gpg-agent-1.scope", &path);
+    if (rc < 0) {
+        printf("failed to get unit path: %s\n", path);
+        return 1;
+    }
+
+    printf("REPLY: %s\n", path);
+
+    dump_properties(bus, path, "org.freedesktop.systemd1.Unit");
+
     dbus_close(bus);
     getchar();
 }
