@@ -49,10 +49,18 @@ int main(void)
     dbus_open_container(reply, 'a', NULL);
 
     while (1) {
-        const char *key, *s_value;
-        uint64_t lu_value;
-        int64_t ld_value;
-        double f_value;
+        const char *key;
+        union {
+            const char *str;
+            uint8_t u8;
+            uint16_t u16;
+            uint32_t u32;
+            uint64_t u64;
+            int16_t i16;
+            int32_t i32;
+            int64_t i64;
+            double dbl;
+        } data;
 
         if (dbus_open_container(reply, 'e', NULL) < 0)
             break;
@@ -65,29 +73,50 @@ int main(void)
         int type = dbus_message_type(reply);
         switch (type) {
         case DBUS_TYPE_UINT16:
+            if (dbus_message_read_basic(reply, type, &data.u16) == 0)
+                printf(" %s[%c]: %hu\n", key, type, data.u16);
+            break;
         case DBUS_TYPE_BOOLEAN:
+            if (dbus_message_read_basic(reply, type, &data.i32) == 0)
+                printf(" %s[%c]: %d\n", key, type, data.i32);
+            break;
         case DBUS_TYPE_UINT32:
+            if (dbus_message_read_basic(reply, type, &data.u32) == 0)
+                printf(" %s[%c]: %u\n", key, type, data.u32);
+            break;
         case DBUS_TYPE_UINT64:
-            if (dbus_message_read_basic(reply, type, &lu_value) == 0)
-                printf(" %s[%c]: %lu\n", key, type, lu_value);
+            if (dbus_message_read_basic(reply, type, &data.u64) == 0)
+                printf(" %s[%c]: %lu\n", key, type, data.u64);
             break;
         case DBUS_TYPE_BYTE:
+            if (dbus_message_read_basic(reply, type, &data.u8) == 0)
+                printf(" %s[%c]: %c\n", key, type, data.u8);
+            break;
         case DBUS_TYPE_INT16:
+            if (dbus_message_read_basic(reply, type, &data.i16) == 0)
+                printf(" %s[%c]: %hd\n", key, type, data.i16);
+            break;
         case DBUS_TYPE_INT32:
+            if (dbus_message_read_basic(reply, type, &data.i32) == 0)
+                printf(" %s[%c]: %d\n", key, type, data.i32);
+            break;
         case DBUS_TYPE_UNIX_FD:
+            if (dbus_message_read_basic(reply, type, &data.i32) == 0)
+                printf(" %s[%c]: %d\n", key, type, data.i32);
+            break;
         case DBUS_TYPE_INT64:
-            if (dbus_message_read_basic(reply, type, &ld_value) == 0)
-                printf(" %s[%c]: %ld\n", key, type, ld_value);
+            if (dbus_message_read_basic(reply, type, &data.i64) == 0)
+                printf(" %s[%c]: %ld\n", key, type, data.i64);
             break;
         case DBUS_TYPE_DOUBLE:
-            if (dbus_message_read_basic(reply, type, &f_value) == 0)
-                printf(" %s[%c]: %f\n", key, type, f_value);
+            if (dbus_message_read_basic(reply, type, &data.dbl) == 0)
+                printf(" %s[%c]: %f\n", key, type, data.dbl);
             break;
         case DBUS_TYPE_STRING:
         case DBUS_TYPE_OBJECT_PATH:
         case DBUS_TYPE_SIGNATURE:
-            if (dbus_message_read_basic(reply, type, &s_value) == 0)
-                printf(" %s[%c]: %s\n", key, type, s_value);
+            if (dbus_message_read_basic(reply, type, &data.str) == 0)
+                printf(" %s[%c]: %s\n", key, type, data.str);
             break;
         default:
             printf(" %s[%c]: ???\n", key, type);
