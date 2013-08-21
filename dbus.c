@@ -181,7 +181,6 @@ void dbus_next(dbus_message *m)
     m->pos--;
     dbus_message_iter_next(&m->stack[m->pos]);
 }
-
 /* }}} */
 
 static dbus_message *dbus_message_create(DBusMessage *msg)
@@ -253,7 +252,7 @@ int dbus_send_with_reply_and_block(dbus_bus *bus, dbus_message *m,
     return 0;
 }
 
-
+/* {{{ appending */
 static inline int dbus_message_append_8bytes(DBusMessageIter *iter, char type, va_list ap)
 {
     uint8_t val = (uint8_t)va_arg(ap, int);
@@ -425,7 +424,9 @@ int dbus_message_append(dbus_message *m, const char *types, ...)
 
     return r;
 }
+/* }}} */
 
+/* {{{ reading */
 int dbus_message_read_basic(DBusMessageIter *iter, char type, va_list ap)
 {
     void *p = va_arg(ap, void *);
@@ -515,3 +516,4 @@ int dbus_message_read(dbus_message *m, const char *types, ...)
 
     return r;
 }
+/* }}} */
