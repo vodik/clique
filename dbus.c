@@ -152,7 +152,16 @@ int dbus_open_container(dbus_message *m, const char type, const char *contents)
     DBusMessageIter *parent = &m->stack[m->pos++];
     DBusMessageIter *child  = &m->stack[m->pos];
 
-    return dbus_message_iter_open_container(parent, type, contents, child);
+    switch (m->mode) {
+    case MESSAGE_WRITING:
+        return dbus_message_iter_open_container(parent, type, contents, child);
+    case MESSAGE_READING:
+        if (dbus_message_iter_get_arg_type(parent) != type)
+            return -EINVAL;
+        dbus_message_iter_recurse(parent, child);
+    }
+
+    return 0;
 }
 
 int dbus_close_container(dbus_message *m)
@@ -160,37 +169,27 @@ int dbus_close_container(dbus_message *m)
     DBusMessageIter *child  = &m->stack[m->pos--];
     DBusMessageIter *parent = &m->stack[m->pos];
 
-    return dbus_message_iter_close_container(parent, child);
-}
-
-void dbus_recurse(dbus_message *m)
-{
-    if (m->pos + 1 == m->size) {
-        m->size *= 2;
-        m->stack = realloc(m->stack, sizeof(DBusMessageIter) * 10);
+    switch (m->mode) {
+    case MESSAGE_WRITING:
+        return dbus_message_iter_close_container(parent, child);
+        break;
+    case MESSAGE_READING:
+        dbus_message_iter_next(parent);
     }
 
-    DBusMessageIter *parent = &m->stack[m->pos++];
-    DBusMessageIter *child  = &m->stack[m->pos];
-
-    dbus_message_iter_recurse(parent, child);
-}
-
-void dbus_next(dbus_message *m)
-{
-    m->pos--;
-    dbus_message_iter_next(&m->stack[m->pos]);
+    return 0;
 }
 /* }}} */
 
-static dbus_message *dbus_message_create(DBusMessage *msg)
+static dbus_message *dbus_message_create(DBusMessage *msg, int mode)
 {
     dbus_message *m = malloc(sizeof(dbus_message));
     *m = (dbus_message){
         .size  = 10,
         .stack = malloc(sizeof(DBusMessageIter) * 10),
         .pos   = 0,
-        .msg   = msg
+        .msg   = msg,
+        .mode  = mode
     };
     return m;
 }
@@ -209,7 +208,7 @@ int dbus_new_method_call(const char *destination,
     if (!msg)
         return -1;
 
-    dbus_message *m = dbus_message_create(msg);
+    dbus_message *m = dbus_message_create(msg, MESSAGE_WRITING);
     dbus_message_iter_init_append(msg, &m->stack[m->pos]);
     *ret = m;
     return 0;
@@ -243,7 +242,7 @@ int dbus_send_with_reply_and_block(dbus_bus *bus, dbus_message *m,
             exit(1);
         }
 
-        dbus_message *r = dbus_message_create(msg);
+        dbus_message *r = dbus_message_create(msg, MESSAGE_READING);
         dbus_message_iter_init(msg, &r->stack[r->pos]);
         *ret = r;
     }
@@ -285,6 +284,33 @@ static inline int dbus_message_append_cstring(DBusMessageIter *iter, char type, 
 
 int dbus_message_append_ap(dbus_message *m, const char *types, va_list ap);
 
+static inline int dbus_message_append_array(dbus_message *m, const char **t, va_list ap)
+{
+    unsigned length = (unsigned)va_arg(ap, unsigned);
+
+    size_t k;
+    int r = signature_element_length(*t + 1, &k);
+    if (r < 0)
+        return r;
+
+    char s[k];
+    memcpy(s, *t + 1, k);
+    s[k] = 0;
+    *t += k;
+
+    r = dbus_open_container(m, **t, s);
+    if (r < 0)
+        return r;
+
+    for (unsigned i = 0; i < length; ++i) {
+        r = dbus_message_append_ap(m, s, ap);
+        if (r < 0)
+            return r;
+    }
+
+    return dbus_close_container(m);
+}
+
 static inline int dbus_message_append_variant(dbus_message *m, va_list ap)
 {
     const char *type = va_arg(ap, const char *);
@@ -314,40 +340,13 @@ static inline int dbus_message_append_struct(dbus_message *m, const char **t, va
     s[k - 2] = 0;
     *t += k - 1;
 
-    r = dbus_open_container(m, 'r', NULL);
+    r = dbus_open_container(m, **t, NULL);
     if (r < 0)
         return r;
 
     r = dbus_message_append_ap(m, s, ap);
     if (r < 0)
         return r;
-
-    return dbus_close_container(m);
-}
-
-static inline int dbus_message_append_array(dbus_message *m, const char **t, va_list ap)
-{
-    unsigned length = (unsigned)va_arg(ap, unsigned);
-
-    size_t k;
-    int r = signature_element_length(*t + 1, &k);
-    if (r < 0)
-        return r;
-
-    char s[k];
-    memcpy(s, *t + 1, k);
-    s[k] = 0;
-    *t += k;
-
-    r = dbus_open_container(m, 'a', s);
-    if (r < 0)
-        return r;
-
-    for (unsigned i = 0; i < length; ++i) {
-        r = dbus_message_append_ap(m, s, ap);
-        if (r < 0)
-            return r;
-    }
 
     return dbus_close_container(m);
 }
@@ -427,15 +426,22 @@ int dbus_message_append(dbus_message *m, const char *types, ...)
 /* }}} */
 
 /* {{{ reading */
-int dbus_message_read_basic(DBusMessageIter *iter, char type, va_list ap)
+int dbus_message_type(dbus_message *m)
 {
-    void *p = va_arg(ap, void *);
+    DBusMessageIter *iter = &m->stack[m->pos];
+    return dbus_message_iter_get_arg_type(iter);
+}
+
+int dbus_message_read_basic(dbus_message *m, char type, void *ptr)
+{
+    DBusMessageIter *iter = &m->stack[m->pos];
 
     int t = dbus_message_iter_get_arg_type(iter);
     if (t != type)
         return -EINVAL;
 
-    dbus_message_iter_get_basic(iter, (const char **)p);
+    dbus_message_iter_get_basic(iter, ptr);
+    dbus_message_iter_next(iter);
     return 0;
 }
 
@@ -447,19 +453,41 @@ static inline int dbus_message_read_variant(dbus_message *m, va_list ap)
     if (!type)
         return -EINVAL;
 
-    int t = dbus_message_iter_get_arg_type(&m->stack[m->pos]);
-    if (t != 'v')
-        return -EINVAL;
+    int r = dbus_open_container(m, 'v', NULL);
+    if (r < 0)
+        return r;
 
-    dbus_recurse(m);
-    int r = dbus_message_read_ap(m, type, ap);
-    dbus_next(m);
+    r = dbus_message_read_ap(m, type, ap);
 
+    dbus_close_container(m);
+    return r;
+}
+
+static inline int dbus_message_read_struct(dbus_message *m, const char **t, va_list ap)
+{
+    size_t k;
+    int r = signature_element_length(*t, &k);
+    if (r < 0)
+        return r;
+
+    char s[k - 1];
+    memcpy(s, *t + 1, k - 2);
+    s[k - 2] = 0;
+    *t += k - 1;
+
+    r = dbus_open_container(m, **t, NULL);
+    if (r < 0)
+        return r;
+
+    r = dbus_message_read_ap(m, s, ap);
+
+    dbus_close_container(m);
     return r;
 }
 
 int dbus_message_read_ap(dbus_message *m, const char *types, va_list ap)
 {
+    void *p;
     int r;
 
     if (!types)
@@ -467,8 +495,6 @@ int dbus_message_read_ap(dbus_message *m, const char *types, va_list ap)
 
     const char *t;
     for (t = types; *t; ++t) {
-        DBusMessageIter *iter = &m->stack[m->pos];
-
         switch (*t) {
         case DBUS_TYPE_BYTE:
         case DBUS_TYPE_BOOLEAN:
@@ -483,10 +509,19 @@ int dbus_message_read_ap(dbus_message *m, const char *types, va_list ap)
         case DBUS_TYPE_OBJECT_PATH:
         case DBUS_TYPE_SIGNATURE:
         case DBUS_TYPE_UNIX_FD:
-            r = dbus_message_read_basic(iter, *t, ap);
+            p = va_arg(ap, void *);
+            r = dbus_message_read_basic(m, *t, p);
+            break;
+        case DBUS_TYPE_ARRAY:
+            printf("reading %c unimplemented\n", *t);
+            r = -EINVAL;
             break;
         case DBUS_TYPE_VARIANT:
             r = dbus_message_read_variant(m, ap);
+            break;
+        case DBUS_STRUCT_BEGIN_CHAR:
+        case DBUS_DICT_ENTRY_BEGIN_CHAR:
+            r = dbus_message_read_struct(m, &t, ap);
             break;
         default:
             printf("reading %c unimplemented\n", *t);
@@ -516,4 +551,7 @@ int dbus_message_read(dbus_message *m, const char *types, ...)
 
     return r;
 }
+
 /* }}} */
+
+

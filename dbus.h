@@ -3,6 +3,11 @@
 
 #include <dbus/dbus.h>
 
+enum mode {
+    MESSAGE_READING,
+    MESSAGE_WRITING
+};
+
 typedef struct dbus_bus_t {
     DBusConnection *conn;
 } dbus_bus;
@@ -10,6 +15,7 @@ typedef struct dbus_bus_t {
 typedef struct dbus_message_t {
     DBusMessage *msg;
 
+    int mode;
     DBusMessageIter *stack;
     size_t size;
     size_t pos;
@@ -31,6 +37,8 @@ int dbus_close_container(dbus_message *m);
 int dbus_message_append_ap(dbus_message *m, const char *types, va_list ap);
 int dbus_message_append(dbus_message *m, const char *types, ...);
 
+int dbus_message_type(dbus_message *m);
+int dbus_message_read_basic(dbus_message *m, char type, void *ptr);
 int dbus_message_read(dbus_message *m, const char *types, ...);
 
 int dbus_send_with_reply_and_block(dbus_bus *bus, dbus_message *m,
