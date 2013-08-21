@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <unistd.h>
 
 #include "dbus.h"
 #include "dbus-systemd.h"
@@ -39,6 +40,11 @@ int main(void)
     int rc;
     const char *path, *substate;
     dbus_bus *bus;
+
+    if (getuid() != 0) {
+        fprintf(stderr, "needs to be run as root\n");
+        return 1;
+    }
 
     dbus_open(DBUS_BUS_SYSTEM, &bus);
     rc = start_transient_scope(bus, "gpg-agent-1.scope",
