@@ -287,6 +287,7 @@ int dbus_message_append_ap(dbus_message *m, const char *types, va_list ap);
 static inline int dbus_message_append_array(dbus_message *m, const char **t, va_list ap)
 {
     unsigned length = (unsigned)va_arg(ap, unsigned);
+    char type = **t;
 
     size_t k;
     int r = signature_element_length(*t + 1, &k);
@@ -298,7 +299,7 @@ static inline int dbus_message_append_array(dbus_message *m, const char **t, va_
     s[k] = 0;
     *t += k;
 
-    r = dbus_open_container(m, **t, s);
+    r = dbus_open_container(m, type, s);
     if (r < 0)
         return r;
 
@@ -331,16 +332,22 @@ static inline int dbus_message_append_variant(dbus_message *m, va_list ap)
 static inline int dbus_message_append_struct(dbus_message *m, const char **t, va_list ap)
 {
     size_t k;
+    char type;
     int r = signature_element_length(*t, &k);
     if (r < 0)
         return r;
+
+    if (**t == '(')
+        type = 'r';
+    if (**t == '{')
+        type = 'e';
 
     char s[k - 1];
     memcpy(s, *t + 1, k - 2);
     s[k - 2] = 0;
     *t += k - 1;
 
-    r = dbus_open_container(m, **t, NULL);
+    r = dbus_open_container(m, type, NULL);
     if (r < 0)
         return r;
 
@@ -452,6 +459,7 @@ static inline int dbus_message_read_array(dbus_message *m, const char **t, va_li
     unsigned length = (unsigned)va_arg(ap, unsigned);
 
     size_t k;
+    char type = **t;
     int r = signature_element_length(*t + 1, &k);
     if (r < 0)
         return r;
@@ -461,7 +469,7 @@ static inline int dbus_message_read_array(dbus_message *m, const char **t, va_li
     s[k] = 0;
     *t += k;
 
-    r = dbus_open_container(m, **t, NULL);
+    r = dbus_open_container(m, type, NULL);
     if (r < 0)
         return r;
 
@@ -494,16 +502,22 @@ static inline int dbus_message_read_variant(dbus_message *m, va_list ap)
 static inline int dbus_message_read_struct(dbus_message *m, const char **t, va_list ap)
 {
     size_t k;
+    char type;
     int r = signature_element_length(*t, &k);
     if (r < 0)
         return r;
+
+    if (**t == '(')
+        type = 'r';
+    if (**t == '{')
+        type = 'e';
 
     char s[k - 1];
     memcpy(s, *t + 1, k - 2);
     s[k - 2] = 0;
     *t += k - 1;
 
-    r = dbus_open_container(m, **t, NULL);
+    r = dbus_open_container(m, type, NULL);
     if (r < 0)
         return r;
 

@@ -12,14 +12,14 @@ int main(void)
     const char *path = "/org/freedesktop/systemd1/unit/gpg_2dagent_2d1_2escope";
 
     dbus_open(DBUS_BUS_SYSTEM, &bus);
-    /* start_transient_scope(bus, "gpg-agent-1.scope", */
-    /*                       "fail", */
-    /*                       "user-1000.slice", */
-    /*                       "transient unit test", */
-    /*                       &reply); */
-    /* dbus_message_read(reply, "o",  &path); */
-    /* printf("REPLY: %s\n", path); */
-    /* dbus_message_free(reply); */
+    start_transient_scope(bus, "gpg-agent-1.scope",
+                          "fail",
+                          "user-1000.slice",
+                          "transient unit test",
+                          &reply);
+    dbus_message_read(reply, "o",  &path);
+    printf("REPLY: %s\n", path);
+    dbus_message_free(reply);
 
     get_unit(bus, "gpg-agent-1.scope", &reply);
     dbus_message_read(reply, "o",  &path);
