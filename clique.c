@@ -48,7 +48,6 @@ int main(void)
 
     dbus_open(DBUS_BUS_SYSTEM, &bus);
     rc = start_transient_scope(bus, "gpg-agent-1.scope",
-                               "fail",
                                "user-1000.slice",
                                "transient unit test",
                                &path);
@@ -67,7 +66,8 @@ int main(void)
 
     printf("REPLY: %s\n", path);
 
-    query_property(bus, path, "org.freedesktop.systemd1.Unit", "SubState", "s", &substate);
+    query_property(bus, path, "org.freedesktop.systemd1.Unit",
+                   "SubState", "s", &substate);
     printf("SubState: %s\n", substate);
 
     dbus_close(bus);

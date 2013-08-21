@@ -17,7 +17,6 @@ static inline int dbus_try_read_object(dbus_bus *bus, dbus_message *reply, const
 
 int start_transient_scope(dbus_bus *bus,
                           const char *name,
-                          const char *mode,
                           const char *slice,
                           const char *description,
                           const char **ret)
@@ -32,7 +31,7 @@ int start_transient_scope(dbus_bus *bus,
     uint32_t pid = getpid();
     uint64_t mem = 1024 * 1024 * 128;
 
-    dbus_message_append(m, "ss", name, mode);
+    dbus_message_append(m, "ss", name, "fail");
 
     dbus_open_container(m, 'a', "(sv)");
     dbus_message_append(m, "(sv)", "Description",  "s",  description);
