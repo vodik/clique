@@ -31,6 +31,8 @@ int dbus_close_container(dbus_message *m);
 int dbus_message_append_ap(dbus_message *m, const char *types, va_list ap);
 int dbus_message_append(dbus_message *m, const char *types, ...);
 
+int dbus_message_read(dbus_message *m, const char *types, ...);
+
 int dbus_send_with_reply_and_block(dbus_bus *bus, dbus_message *m,
                                    dbus_message **ret);
 

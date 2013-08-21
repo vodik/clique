@@ -421,3 +421,8 @@ int dbus_message_append(dbus_message *m, const char *types, ...)
 
     return r;
 }
+
+int dbus_message_read(dbus_message *m, const char *types, ...)
+{
+    return 0;
+}

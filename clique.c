@@ -16,20 +16,11 @@ int main(void)
                           "transient unit test",
                           NULL);
 
-
     get_unit(bus, "gpg-agent-1.scope", &reply);
 
-    char *path;
-    {
-        DBusMessageIter args;
-        int type;
-
-        dbus_message_iter_init(reply->msg, &args);
-
-        type = dbus_message_iter_get_arg_type(&args);
-        dbus_message_iter_get_basic(&args, &path);
-        printf(":: TYPE: %c: %s\n", type, path);
-    }
+    const char *path;
+    dbus_message_read(reply, "o",  &path);
+    printf("REPLY: %s\n", path);
 
     dbus_message_free(reply);
     dbus_close(bus);
