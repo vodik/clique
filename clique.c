@@ -20,8 +20,8 @@ static void busy_loop()
 int main(void)
 {
     int rc;
-    const char *ret, *path, *state;
-    const char *scope = "gpg-agent-1.scope";
+    const char *path, *state;
+    const char *scope = "gpg-agent.scope";
     dbus_bus *bus;
 
     if (getuid() != 0) {
@@ -48,13 +48,12 @@ int main(void)
     }
 
     /* get the assiociated unit */
-    rc = get_unit_by_pid(bus, pid, &ret);
+    rc = get_unit_by_pid(bus, pid, &path);
     if (rc < 0) {
         printf("failed to get unit path: %s\n", bus->error);
         return 1;
     }
 
-    path = strdup(ret);
     printf("PATH: %s\n", path);
 
     /* check state */

@@ -1,22 +1,26 @@
 #include "dbus-systemd.h"
 
 #include <stdlib.h>
-#include <stdio.h>
+#include <string.h>
 #include <stdint.h>
 #include <unistd.h>
 
 #include "dbus-lib.h"
 
-static inline int dbus_try_read_object(dbus_bus *bus, dbus_message *reply, const char **ret)
+static inline int dbus_try_read_object(dbus_bus *bus, dbus_message *reply, char **ret)
 {
     int type = dbus_message_type(reply);
+    const char *buf;
     int rc = 0;
 
-    if (type == 'o')
-        rc = dbus_message_read(reply, "o", ret);
-    else if (type == 's') {
+    if (type == 'o') {
+        rc = dbus_message_read(reply, "o", &buf);
+        *ret = strdup(buf);
+    } else if (type == 's') {
         rc = -1;
-        dbus_message_read(reply, "s", &bus->error);
+        dbus_message_read(reply, "s", &buf);
+        free(bus->error);
+        bus->error = strdup(buf);
     }
 
     return rc;
@@ -27,7 +31,7 @@ int start_transient_scope(dbus_bus *bus,
                           const char *slice,
                           const char *description,
                           uint32_t pid,
-                          const char **ret)
+                          char **ret)
 {
     int rc = 0;
     dbus_message *m;
@@ -66,7 +70,7 @@ int start_transient_scope(dbus_bus *bus,
     return rc;
 }
 
-int get_unit_by_pid(dbus_bus *bus, uint32_t pid, const char **ret)
+int get_unit_by_pid(dbus_bus *bus, uint32_t pid, char **ret)
 {
     int rc = 0;
     dbus_message *m;
@@ -92,7 +96,7 @@ int get_unit_by_pid(dbus_bus *bus, uint32_t pid, const char **ret)
     return rc;
 }
 
-int get_unit(dbus_bus *bus, const char *name, const char **ret)
+int get_unit(dbus_bus *bus, const char *name, char **ret)
 {
     int rc = 0;
     dbus_message *m;
@@ -117,7 +121,6 @@ int get_unit(dbus_bus *bus, const char *name, const char **ret)
 
 void unit_kill(dbus_bus *bus, const char *path, int32_t signal)
 {
-    printf("PATH: %s\n", path);
     dbus_message *m;
     dbus_new_method_call("org.freedesktop.systemd1",
                          path,

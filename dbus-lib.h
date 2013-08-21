@@ -11,7 +11,7 @@ enum mode {
 
 typedef struct dbus_bus_t {
     DBusConnection *conn;
-    const char *error;
+    char *error;
 } dbus_bus;
 
 typedef struct dbus_message_t {
