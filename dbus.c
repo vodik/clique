@@ -447,6 +447,33 @@ int dbus_message_read_basic(dbus_message *m, char type, void *ptr)
 
 int dbus_message_read_ap(dbus_message *m, const char *types, va_list ap);
 
+static inline int dbus_message_read_array(dbus_message *m, const char **t, va_list ap)
+{
+    unsigned length = (unsigned)va_arg(ap, unsigned);
+
+    size_t k;
+    int r = signature_element_length(*t + 1, &k);
+    if (r < 0)
+        return r;
+
+    char s[k];
+    memcpy(s, *t + 1, k);
+    s[k] = 0;
+    *t += k;
+
+    r = dbus_open_container(m, **t, NULL);
+    if (r < 0)
+        return r;
+
+    for (unsigned i = 0; i < length; ++i) {
+        r = dbus_message_read_ap(m, s, ap);
+        if (r < 0)
+            return r;
+    }
+
+    return dbus_close_container(m);
+}
+
 static inline int dbus_message_read_variant(dbus_message *m, va_list ap)
 {
     const char *type = va_arg(ap, const char *);
@@ -458,9 +485,10 @@ static inline int dbus_message_read_variant(dbus_message *m, va_list ap)
         return r;
 
     r = dbus_message_read_ap(m, type, ap);
+    if (r < 0)
+        return r;
 
-    dbus_close_container(m);
-    return r;
+    return dbus_close_container(m);
 }
 
 static inline int dbus_message_read_struct(dbus_message *m, const char **t, va_list ap)
@@ -480,9 +508,10 @@ static inline int dbus_message_read_struct(dbus_message *m, const char **t, va_l
         return r;
 
     r = dbus_message_read_ap(m, s, ap);
+    if (r < 0)
+        return r;
 
-    dbus_close_container(m);
-    return r;
+    return dbus_close_container(m);
 }
 
 int dbus_message_read_ap(dbus_message *m, const char *types, va_list ap)
@@ -513,7 +542,7 @@ int dbus_message_read_ap(dbus_message *m, const char *types, va_list ap)
             r = dbus_message_read_basic(m, *t, p);
             break;
         case DBUS_TYPE_ARRAY:
-            printf("reading %c unimplemented\n", *t);
+            r = dbus_message_read_array(m, &t, ap);
             r = -EINVAL;
             break;
         case DBUS_TYPE_VARIANT:
