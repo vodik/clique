@@ -113,6 +113,17 @@ static int signature_element_length(const char *s, size_t *l) {
 }
 /* }}} */
 
+static char *get_session_socket()
+{
+    char *socket;
+    const char *xdg_runtime_dir = getenv("XDG_RUNTIME_DIR");
+
+    if (asprintf(&socket, "unix:path=%s/systemd/private", xdg_runtime_dir) < 0)
+        return NULL;
+
+    return socket;
+}
+
 int dbus_open(int type, dbus_bus **ret)
 {
     DBusConnection *conn;
@@ -120,7 +131,14 @@ int dbus_open(int type, dbus_bus **ret)
 
     dbus_error_init(&err);
 
-    conn = dbus_bus_get(type, &err);
+    if (type == DBUS_BUS_SESSION) {
+        char *socket = get_session_socket();
+        conn = dbus_connection_open(socket, &err);
+        free(socket);
+    } else {
+        conn = dbus_bus_get(type, &err);
+    }
+
     if (dbus_error_is_set(&err)) {
         fprintf(stderr, "Connection Error (%s)\n", err.message);
         dbus_error_free(&err);

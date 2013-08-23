@@ -24,10 +24,10 @@ int main(void)
     const char *scope = "gpg-agent.scope";
     dbus_bus *bus;
 
-    if (getuid() != 0) {
-        fprintf(stderr, "needs to be run as root\n");
-        return 1;
-    }
+    /* if (getuid() != 0) { */
+    /*     fprintf(stderr, "needs to be run as root\n"); */
+    /*     return 1; */
+    /* } */
 
     pid_t pid = fork();
     if (pid == 0)
@@ -35,7 +35,7 @@ int main(void)
 
     printf("pid: %ld\n", (long)pid);
 
-    dbus_open(DBUS_BUS_SYSTEM, &bus);
+    dbus_open(DBUS_BUS_SESSION, &bus);
 
     /* start the transient scope */
     rc = start_transient_scope(bus, scope,
