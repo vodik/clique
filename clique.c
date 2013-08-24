@@ -20,7 +20,7 @@ static void busy_loop()
 int main(void)
 {
     int rc;
-    const char *path, *state;
+    char *path, *state;
     const char *scope = "gpg-agent.scope";
     dbus_bus *bus;
 
