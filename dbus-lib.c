@@ -118,6 +118,9 @@ static char *get_session_socket()
     char *socket;
     const char *xdg_runtime_dir = getenv("XDG_RUNTIME_DIR");
 
+    if (!xdg_runtime_dir)
+        return NULL;
+
     if (asprintf(&socket, "unix:path=%s/systemd/private", xdg_runtime_dir) < 0)
         return NULL;
 
@@ -133,6 +136,10 @@ int dbus_open(int type, dbus_bus **ret)
 
     if (type == DBUS_BUS_SESSION) {
         char *socket = get_session_socket();
+
+        if (!socket)
+            return -1;
+
         conn = dbus_connection_open(socket, &err);
         free(socket);
     } else {
