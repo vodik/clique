@@ -24,11 +24,6 @@ int main(void)
     const char *scope = "gpg-agent.scope";
     dbus_bus *bus;
 
-    /* if (getuid() != 0) { */
-    /*     fprintf(stderr, "needs to be run as root\n"); */
-    /*     return 1; */
-    /* } */
-
     pid_t pid = fork();
     if (pid == 0)
         busy_loop();
