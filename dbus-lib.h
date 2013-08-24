@@ -9,6 +9,12 @@ enum mode {
     MESSAGE_WRITING
 };
 
+enum type {
+    DBUS_SESSION,
+    DBUS_SYSTEM,
+    DBUS_AUTO
+};
+
 typedef struct dbus_bus_t {
     DBusConnection *conn;
     char *error;

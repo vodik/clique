@@ -30,11 +30,11 @@ int main(void)
 
     printf("pid: %ld\n", (long)pid);
 
-    dbus_open(DBUS_BUS_SESSION, &bus);
+    dbus_open(DBUS_AUTO, &bus);
 
     /* start the transient scope */
     rc = start_transient_scope(bus, scope,
-                               "user-1000.slice",
+                               NULL,
                                "transient unit test",
                                pid, &path);
     if (rc < 0) {

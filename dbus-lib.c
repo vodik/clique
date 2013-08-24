@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 
 /* {{{ parsing */
 bool bus_type_is_basic(char c) {
@@ -129,21 +130,29 @@ static char *get_session_socket()
 
 int dbus_open(int type, dbus_bus **ret)
 {
+    char *socket;
     DBusConnection *conn;
     DBusError err;
 
     dbus_error_init(&err);
 
-    if (type == DBUS_BUS_SESSION) {
-        char *socket = get_session_socket();
+    if (type == DBUS_AUTO) {
+        type = (getuid() == 0) ? DBUS_SYSTEM : DBUS_SESSION;
+    }
+
+    switch (type) {
+    case DBUS_SESSION:
+        socket = get_session_socket();
 
         if (!socket)
             return -1;
 
         conn = dbus_connection_open(socket, &err);
         free(socket);
-    } else {
+        break;
+    case DBUS_SYSTEM:
         conn = dbus_bus_get(type, &err);
+        break;
     }
 
     if (dbus_error_is_set(&err)) {
