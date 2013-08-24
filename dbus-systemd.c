@@ -47,8 +47,12 @@ int start_transient_scope(dbus_bus *bus,
     dbus_message_append(m, "ss", name, "fail");
 
     dbus_open_container(m, 'a', "(sv)");
-    dbus_message_append(m, "(sv)", "Description",  "s",  description);
-    dbus_message_append(m, "(sv)", "Slice",        "s",  slice);
+
+    dbus_message_append(m, "(sv)", "Description", "s", description);
+
+    if (slice)
+        dbus_message_append(m, "(sv)", "Slice", "s", slice);
+
     dbus_message_append(m, "(sv)", "PIDs",         "au", 1, pid);
     dbus_message_append(m, "(sv)", "MemoryLimit",  "t",  mem);
     dbus_message_append(m, "(sv)", "DevicePolicy", "s",  "strict");
