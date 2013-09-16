@@ -40,7 +40,7 @@ int start_transient_scope(dbus_bus *bus,
                          "org.freedesktop.systemd1.Manager",
                          "StartTransientUnit", &m);
 
-    uint64_t mem = 1024 * 1024 * 128;
+    /* uint64_t mem = 1024 * 1024 * 128; */
     if (pid == 0)
         pid = getpid();
 
@@ -54,12 +54,12 @@ int start_transient_scope(dbus_bus *bus,
         dbus_message_append(m, "(sv)", "Slice", "s", slice);
 
     dbus_message_append(m, "(sv)", "PIDs",         "au", 1, pid);
-    dbus_message_append(m, "(sv)", "MemoryLimit",  "t",  mem);
-    dbus_message_append(m, "(sv)", "DevicePolicy", "s",  "strict");
-    dbus_message_append(m, "(sv)", "DeviceAllow",  "a(ss)", 3,
-                                "/dev/urandom", "r",
-                                "/dev/random",  "r",
-                                "/dev/null",    "rw");
+    /* dbus_message_append(m, "(sv)", "MemoryLimit",  "t",  mem); */
+    /* dbus_message_append(m, "(sv)", "DevicePolicy", "s",  "strict"); */
+    /* dbus_message_append(m, "(sv)", "DeviceAllow",  "a(ss)", 3, */
+    /*                             "/dev/urandom", "r", */
+    /*                             "/dev/random",  "r", */
+    /*                             "/dev/null",    "rw"); */
     dbus_close_container(m);
 
     dbus_message *reply;
