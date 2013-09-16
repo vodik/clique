@@ -591,7 +591,6 @@ int dbus_message_read_ap(dbus_message *m, const char *types, va_list ap)
             break;
         case DBUS_TYPE_ARRAY:
             r = dbus_message_read_array(m, &t, ap);
-            r = -EINVAL;
             break;
         case DBUS_TYPE_VARIANT:
             r = dbus_message_read_variant(m, ap);
@@ -628,7 +627,4 @@ int dbus_message_read(dbus_message *m, const char *types, ...)
 
     return r;
 }
-
 /* }}} */
-
-
