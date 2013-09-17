@@ -21,26 +21,22 @@ int main(void)
 {
     int rc;
     char *path, *state;
-    const char *scope = "gpg-agent.scope";
     dbus_bus *bus;
+    dbus_open(DBUS_AUTO, &bus);
 
     pid_t pid = fork();
-    if (pid == 0)
+    if (pid == 0) {
         busy_loop();
+    }
 
     printf("pid: %ld\n", (long)pid);
 
-    dbus_open(DBUS_AUTO, &bus);
+    dbus_message *scope;
+    scope_init(&scope, "clique.scope", NULL, "transient unit test", pid);
+    scope_memory_limit(scope, 1024 * 1024 * 128);
+    scope_commit(bus, scope, NULL);
 
-    /* start the transient scope */
-    rc = start_transient_scope(bus, scope,
-                               NULL,
-                               "transient unit test",
-                               pid, &path);
-    if (rc < 0) {
-        printf("failed to start transient scope: %s\n", bus->error);
-        return 1;
-    }
+    /* char *path; */
 
     /* get the assiociated unit */
     rc = get_unit_by_pid(bus, pid, &path);
