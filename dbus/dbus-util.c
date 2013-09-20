@@ -1,6 +1,5 @@
 #include "dbus-util.h"
-
-#include "dbus-lib.h"
+#include "dbus-shim.h"
 
 int query_property(dbus_bus *bus, const char *path, const char *interface,
                    const char *property, const char *types, ...)

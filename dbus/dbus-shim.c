@@ -1,4 +1,4 @@
-#include "dbus-lib.h"
+#include "dbus-shim.h"
 
 #include <stdlib.h>
 #include <stdio.h>

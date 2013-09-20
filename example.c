@@ -6,9 +6,10 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include "dbus-lib.h"
-#include "dbus-util.h"
-#include "dbus-systemd.h"
+#include "dbus/dbus-shim.h"
+#include "dbus/dbus-util.h"
+#include "systemd-scope.h"
+#include "systemd-unit.h"
 
 static void busy_loop()
 {
@@ -48,8 +49,7 @@ int main(void)
     printf("PATH: %s\n", path);
 
     /* check state */
-    query_property(bus, path, "org.freedesktop.systemd1.Unit",
-                   "SubState", "s", &state);
+    get_unit_state(bus, path, &state);
     printf("State: %s\n", state);
 
     /* kill */
@@ -57,7 +57,6 @@ int main(void)
     unit_kill(bus, path, SIGTERM);
 
     /* check state */
-    query_property(bus, path, "org.freedesktop.systemd1.Unit",
-                   "SubState", "s", &state);
+    get_unit_state(bus, path, &state);
     printf("State: %s\n", state);
 }

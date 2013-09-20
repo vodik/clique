@@ -6,9 +6,10 @@ CFLAGS := -std=c99 \
 
 LDLIBS = -ldbus-1
 
-all: clique
+all: example
 
-clique: clique.o dbus-lib.o dbus-util.o dbus-systemd.o
+example: example.o systemd-scope.o systemd-unit.o \
+	dbus/dbus-shim.o dbus/dbus-util.o
 
 clean:
 	${RM} clique *.o
