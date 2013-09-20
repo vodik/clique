@@ -20,6 +20,12 @@ static void busy_loop()
 
 int main(void)
 {
+    static const device_t devices[] = {
+        { "/dev/urandom", "r"  },
+        { "/dev/random",  "r"  },
+        { "/dev/null",    "rw" }
+    };
+
     int rc;
     char *path, *state;
     dbus_bus *bus;
@@ -35,9 +41,9 @@ int main(void)
     dbus_message *scope;
     scope_init(&scope, "clique.scope", NULL, "transient unit test", pid);
     scope_memory_limit(scope, 1024 * 1024 * 128);
+    scope_device_policy(scope, "strict");
+    scope_allow_device(scope, 3, devices);
     scope_commit(bus, scope, NULL);
-
-    /* char *path; */
 
     /* get the assiociated unit */
     rc = get_unit_by_pid(bus, pid, &path);

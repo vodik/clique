@@ -71,3 +71,26 @@ int scope_commit(dbus_bus *bus, dbus_message *m, char **ret)
 
     return rc;
 }
+
+int scope_device_policy(dbus_message *m, const char *policy)
+{
+    return dbus_message_append(m, "(sv)", "DevicePolicy", "s", policy);
+}
+
+int scope_allow_device(dbus_message *m, size_t count, device_t *devices)
+{
+    size_t i;
+
+    dbus_open_container(m, 'r', NULL);
+    dbus_message_append(m, "s", "DeviceAllow");
+    dbus_open_container(m, 'v', "a(ss)");
+    dbus_open_container(m, 'a', "(ss)");
+
+    for (i = 0; i < count; ++i)
+        dbus_message_append(m, "(ss)", devices[i].device, devices[i].perm);
+
+    dbus_close_container(m);
+    dbus_close_container(m);
+    dbus_close_container(m);
+    return 0;
+}
