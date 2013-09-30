@@ -11,7 +11,7 @@
 #include "systemd-scope.h"
 #include "systemd-unit.h"
 
-static void busy_loop()
+static void busy_loop(void)
 {
     while (1) {
         sleep (5);

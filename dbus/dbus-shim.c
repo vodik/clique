@@ -114,7 +114,7 @@ static int signature_element_length(const char *s, size_t *l) {
 }
 /* }}} */
 
-static char *get_session_socket()
+static char *get_session_socket(void)
 {
     char *socket;
     const char *xdg_runtime_dir = getenv("XDG_RUNTIME_DIR");
