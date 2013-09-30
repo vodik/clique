@@ -9,7 +9,7 @@
 #include <unistd.h>
 
 /* {{{ parsing */
-bool bus_type_is_basic(char c) {
+static bool bus_type_is_basic(char c) {
         static const char valid[] = {
                 DBUS_TYPE_BYTE,
                 DBUS_TYPE_BOOLEAN,

@@ -16,6 +16,6 @@ int scope_memory_limit(dbus_message *m, int32_t limit);
 int scope_commit(dbus_bus *bus, dbus_message *m, char **ret);
 
 int scope_device_policy(dbus_message *m, const char *policy);
-int scope_allow_device(dbus_message *m, size_t count, device_t *devices);
+int scope_allow_device(dbus_message *m, size_t count, const device_t *devices);
 
 #endif

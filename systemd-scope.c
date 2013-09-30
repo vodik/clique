@@ -77,7 +77,7 @@ int scope_device_policy(dbus_message *m, const char *policy)
     return dbus_message_append(m, "(sv)", "DevicePolicy", "s", policy);
 }
 
-int scope_allow_device(dbus_message *m, size_t count, device_t *devices)
+int scope_allow_device(dbus_message *m, size_t count, const device_t *devices)
 {
     size_t i;
 
