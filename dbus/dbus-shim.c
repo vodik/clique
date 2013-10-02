@@ -366,14 +366,14 @@ static inline int dbus_message_append_variant(dbus_message *m, va_list ap)
 static inline int dbus_message_append_struct(dbus_message *m, const char **t, va_list ap)
 {
     size_t k;
-    char type;
+    char type = **t;
     int r = signature_element_length(*t, &k);
-    if (r < 0)
+    if (r < 0 || k <= 1)
         return r;
 
-    if (**t == '(')
+    if (type == '(')
         type = 'r';
-    if (**t == '{')
+    if (type == '{')
         type = 'e';
 
     char s[k - 1];
@@ -536,14 +536,14 @@ static inline int dbus_message_read_variant(dbus_message *m, va_list ap)
 static inline int dbus_message_read_struct(dbus_message *m, const char **t, va_list ap)
 {
     size_t k;
-    char type;
+    char type = **t;
     int r = signature_element_length(*t, &k);
-    if (r < 0)
+    if (r < 0 || k <= 1)
         return r;
 
-    if (**t == '(')
+    if (type == '(')
         type = 'r';
-    if (**t == '{')
+    if (type == '{')
         type = 'e';
 
     char s[k - 1];
