@@ -131,7 +131,7 @@ static char *get_session_socket(void)
 int dbus_open(int type, dbus_bus **ret)
 {
     char *socket;
-    DBusConnection *conn;
+    DBusConnection *conn = NULL;
     DBusError err;
 
     dbus_error_init(&err);
