@@ -21,6 +21,7 @@ static inline int dbus_try_read_object(dbus_bus *bus, dbus_message *reply, char 
         dbus_message_read(reply, "s", &buf);
         free(bus->error);
         bus->error = strdup(buf);
+        *ret = NULL;
     }
 
     return rc;
